@@ -1,0 +1,17 @@
+key	value
+schema_version	0.1
+stage3_version	0.1
+n_dyads	2
+n_chroms	2
+inversion_atlas_supplied	yes
+inversion_atlas_path	NA
+hard_call_threshold_hom	0.95
+hard_call_threshold_het	0.90
+min_run_length_sites	3
+beagle_input	NA
+sample_list	NA
+emit_per_site	no
+n_intervals	8
+n_background_blocks	4
+datetime	2026-05-12T08:00:00+07:00
+host	test

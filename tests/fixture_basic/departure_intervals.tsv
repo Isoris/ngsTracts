@@ -1,0 +1,9 @@
+interval_id	parent_id	offspring_id	chrom	start	end	n_sites	n_discordant	span_bp	flanking_left_state	flanking_right_state	departure_state	distance_to_nearest_inv_bp	inside_inversion	confidence
+DEP_000001	P1	O1	C_gar_LG01	5000000	5000500	8	8	501	hapA	hapA	hapB	1245000	no	high
+DEP_000002	P2	O2	C_gar_LG28	16000000	16000200	6	6	201	hapA	hapA	hapB	0	yes	high
+DEP_000003	P1	O1	C_gar_LG01	19900000	20100000	80	60	200001	hapA	hapB	hapB	-	no	high
+DEP_000004	P2	O2	C_gar_LG28	5000000	5100000	70	68	100001	hapA	hapA	hapB	-	no	high
+DEP_000005	P2	O2	C_gar_LG28	10000000	10600000	200	180	600001	hapA	hapA	hapB	-	no	medium
+DEP_000006	P1	O1	C_gar_LG01	2000000	2000300	5	5	301	hapA	hapB	hapB	-	no	high
+DEP_000007	P1	O1	C_gar_LG01	7000000	7000300	2	2	301	hapA	hapA	hapB	-	no	high
+DEP_000008	P2	O2	C_gar_LG28	16500000	16600000	60	58	100001	hapA	hapA	hapB	0	yes	high
