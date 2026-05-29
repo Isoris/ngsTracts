@@ -115,6 +115,15 @@ def main(argv=None) -> int:
     p.add_argument("--inversion-atlas", type=Path, default=None,
                    help="optional atlas (inversion_id,chrom,start,end) for "
                         "per-inversion aggregation")
+    p.add_argument("--per-sample", action="store_true",
+                   help="also emit one BED per carrier sample (for GL-based "
+                        "per-sample masking, where a global BED would drop a "
+                        "site for all samples)")
+    p.add_argument("--sample-key", choices=["offspring", "parent", "both"],
+                   default="offspring",
+                   help="which sample carries the tract for --per-sample. The "
+                        "offspring inherits the exchanged sequence, so it is "
+                        "the carrier (default offspring)")
     args = p.parse_args(argv)
     args.outdir.mkdir(parents=True, exist_ok=True)
 
@@ -142,22 +151,61 @@ def main(argv=None) -> int:
     if args.inversion_atlas is not None:
         seg = assign_inversions(seg, load_atlas(args.inversion_atlas))
 
-    # ---- per-tract BED6 ----
+    # Reusable BED6 name/score columns.
+    if len(seg):
+        seg["_score"] = (seg["confidence"].map(CONF_SCORE).fillna(0).astype(int)
+                         if "confidence" in seg.columns else 0)
+        seg["_name"] = (seg["class"] + "|" + seg["interval_id"].astype(str)
+                        + "|" + seg.get("parent_id", "?").astype(str)
+                        + ">" + seg.get("offspring_id", "?").astype(str))
+
+    # ---- per-tract BED6 (global; pooled over all samples) ----
     bed_path = args.outdir / "exchange_segments.bed"
     if len(seg):
-        score = seg["confidence"].map(CONF_SCORE).fillna(0).astype(int) \
-            if "confidence" in seg.columns else 0
-        name = (seg["class"] + "|" + seg["interval_id"].astype(str)
-                + "|" + seg.get("parent_id", "?").astype(str)
-                + ">" + seg.get("offspring_id", "?").astype(str))
-        bed6 = pd.DataFrame({
+        pd.DataFrame({
             "chrom": seg["chrom"], "start": seg["bed_start"], "end": seg["bed_end"],
-            "name": name, "score": score, "strand": ".",
-        })
-        bed6.to_csv(bed_path, sep="\t", index=False, header=False)
+            "name": seg["_name"], "score": seg["_score"], "strand": ".",
+        }).to_csv(bed_path, sep="\t", index=False, header=False)
     else:
         bed_path.write_text("")
     log(f"wrote {bed_path}")
+
+    # ---- per-sample BEDs (for GL-based per-sample masking) ----
+    # A global BED would drop a site for ALL samples; with genotype likelihoods
+    # we want to exclude only the carrier sample's contribution at these sites.
+    # The offspring inherits the exchanged sequence and is the carrier.
+    if args.per_sample:
+        roles = {"offspring": ["offspring_id"], "parent": ["parent_id"],
+                 "both": ["offspring_id", "parent_id"]}[args.sample_key]
+        for r in roles:
+            if r not in seg.columns:
+                die(f"--per-sample needs column {r} in tract_classifications.tsv")
+        by_dir = args.outdir / "by_sample"
+        by_dir.mkdir(parents=True, exist_ok=True)
+        long_cols = ["sample_id", "role", "chrom", "bed_start", "bed_end",
+                     "class", "interval_id", "parent_id", "offspring_id"]
+        parts = []
+        if len(seg):
+            for r in roles:
+                role_name = "offspring" if r == "offspring_id" else "parent"
+                part = seg.copy()
+                part["sample_id"] = part[r]
+                part["role"] = role_name
+                parts.append(part)
+        long = pd.concat(parts, ignore_index=True) if parts else \
+            pd.DataFrame(columns=long_cols)
+
+        for sid, g in long.groupby("sample_id"):
+            pd.DataFrame({
+                "chrom": g["chrom"], "start": g["bed_start"], "end": g["bed_end"],
+                "name": g["_name"], "score": g["_score"], "strand": ".",
+            }).sort_values(["chrom", "start"]).to_csv(
+                by_dir / f"{sid}.exchange.bed", sep="\t", index=False, header=False)
+
+        long_path = args.outdir / "exchange_segments.by_sample.tsv"
+        (long[long_cols] if len(long) else long).to_csv(long_path, sep="\t", index=False)
+        n_samples = long["sample_id"].nunique() if len(long) else 0
+        log(f"wrote {n_samples} per-sample BEDs to {by_dir}/ and {long_path}")
 
     # ---- merged across dyads (support = pileup depth) ----
     merged_path = args.outdir / "exchange_segments.merged.bed"
