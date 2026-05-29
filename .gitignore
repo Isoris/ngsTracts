@@ -59,6 +59,7 @@ desktop.ini
 
 # Project-specific: run outputs / scratch
 out/
+tests/tmp_*/
 output/
 results/
 *.tsv.tmp
